@@ -15,9 +15,10 @@ The rendered HTML report, including R code, outputs, tables, and figures, is ava
 ## Repository content
 
 - `docs/index.html`: rendered HTML report with code, outputs, and figures.
-- `stat_aroeira.csv`: dataset used in the analyses.
 - `README.md`: repository description and access information.
 - `analysis.Rmd`: source R Markdown file used to generate the HTML report.
+- `stat_aroeira.csv`: dataset used in the analyses.
+
 
 ## Notes
 
