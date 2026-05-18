@@ -1,0 +1,217 @@
+---
+title: "Schinus_multivariate"
+author: "Jorge Alonso"
+date: "2026-05-18"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: show
+    self_contained: true
+---
+
+# 1. Preparing
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width = 7,
+  fig.height = 5,
+  dpi = 300)
+```
+
+```{r, message = FALSE}
+# Loading packages
+library(openxlsx)
+library(tidyverse)
+library(corrplot)
+library(psych)
+library(factoextra)
+library(ggrepel)
+```
+
+
+```{r, message = FALSE}
+# Cleaning memory
+rm(list=ls(all=TRUE))
+gc()
+```
+
+
+```{r}
+# Database link
+raw_url <- "https://raw.githubusercontent.com/jmalonso55/schinus-substrate-fertilizer/refs/heads/main/stat_aroeira.csv"
+```
+
+
+```{r}
+# Loading data
+data <- read.csv(raw_url, sep = ",")
+
+# Checking
+summary(data)
+```
+
+```{r}
+# Recoding variables
+data <- data %>% mutate(Subst_alt = case_when(
+    Subst == 1 ~ "SS",
+    Subst == 2 ~ "CS")) %>% 
+  mutate(Subst_alt = factor(Subst_alt, levels = c("SS", "CS")))
+```
+
+
+# 2. Correlation analysis
+
+```{r}
+# Correlation matrix
+mcor <- cor(data[, 6:12])
+
+# Visualizando os valores
+mcor
+```
+
+```{r}
+# Coefficient significance
+test_cor <- cor.mtest(data[, 6:12])
+
+# Visualizing p_value
+round(test_cor$p, 4)
+```
+
+```{r}
+# Color pallete
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+
+# Plotting
+corrplot(mcor, method="color", col=col(200), type="upper", order="hclust", number.cex = 0.5, number.font = 1, addCoef.col = "black", tl.cex = 0.5, tl.col="black", tl.srt=0, tl.offset = 1, p.mat = test_cor$p, sig.level = 0.06, insig = "blank", diag=FALSE) 
+```
+
+
+# 3. Principal components analysis
+
+```{r}
+# Checking factor adequacy
+KMO(data[, 6:12])
+```
+
+```{r}
+# Running PCA
+pcadata <- prcomp(data[, 6:12], scale = T)
+
+# Resume
+summary(pcadata)
+```
+
+```{r}
+# PCA loadings
+round(pcadata$rotation, 2)
+```
+
+```{r}
+# Basic biplot
+fviz_pca_biplot(pcadata, repel = TRUE, geom.ind = "point", pointsize = 1.2)
+```
+
+
+```{r}
+# Biplot
+fviz_pca_biplot(pcadata, col.ind = data$Subst_alt, repel = TRUE, palette = c("#FF9999","#0099FF"), mean.point = FALSE, geom.ind = "point", pointsize = 2.5, col.var = "#708090", title = "", legend.title = "Substrate:") +
+  geom_text_repel(aes(label = data$Rate, color = data$Subst_alt),  inherit.aes = TRUE, show.legend=FALSE)+
+  theme(text = element_text(size=12,  family="serif"), 
+        legend.position="bottom")
+```
+
+
+# 4. Cluster analysis
+
+## 4.1. Kmeans
+
+```{r}
+# Selecting the number of clusters
+fviz_nbclust(data[,6:12], kmeans, method = "wss") +
+  xlab("Number of k cluster") +
+  ylab("Within-cluster sum of squares")
+```
+
+
+```{r}
+# Kmeans cluster analysis
+df <- scale(data[,6:12])
+set.seed(123)
+km.res <- kmeans(df, 3, nstart = 25)
+
+# Results
+km.res
+```
+
+```{r}
+# Results in the right scale
+cluster <- cbind(data[,6:12], cluster = km.res$cluster)
+aggregate(cluster, by=list(cluster=cluster$cluster), mean)
+
+```
+
+
+```{r}
+# Basic cluster plot
+fviz_cluster(km.res, data = df, main ="", repel=TRUE)
+```
+
+
+```{r}
+# Cluster + PCA
+fviz_pca_biplot(pcadata, habillage = as.factor(km.res$cluster), repel = TRUE, addEllipses = TRUE, ellipse.type = "convex", col.var = "#708090", geom.ind = "point", legend = "bottom", legend.title = "Clusters:", title = "", palette = "Dark2", pointsize = 3, mean.point = FALSE) +
+  theme(text = element_text(size = 14,  family = "serif"),
+        legend.position = "bottom")
+```
+
+
+## 4.2. Hierarchical
+
+```{r}
+# Adding labels
+rownames(df) <- interaction(data$Subst_alt, data$Rate)
+```
+
+```{r}
+# Euclidean distance
+dist_hc <- dist(df, method = "euclidean")
+```
+
+```{r}
+# Hierarchical cluster
+hc_ward <- hclust(dist_hc, method = "ward.D2")
+```
+
+```{r}
+# Dendrogram
+fviz_dend(hc_ward, k = 3, rect = TRUE, show_labels = TRUE, palette = "Dark2", main = "") +
+  theme(text = element_text(size = 14, family = "serif"))
+```
+
+
+## 4.3. Variables cluster
+
+```{r}
+# Euclidean distance
+dist_cor <- dist(mcor, method = "euclidean")
+```
+
+```{r}
+# Cluster
+hc = hclust(dist_cor, method = "ward.D")
+hc$labels<-c("Height", "Diameter", "H/D", "SDM", "RDM", "S/R", "DQI")
+```
+
+```{r}
+# Plotting
+fviz_dend(hc, cex = 1.3, k = 3, color_labels_by_k = TRUE, repel = TRUE, main = "",  type = "phylogenic", ylab = "", palette = "Dark2", ggtheme = theme_classic())
+```
+
+
+
+
