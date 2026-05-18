@@ -1,0 +1,2 @@
+*.Rmd linguist-language=RMarkdown
+docs/*.html linguist-generated=true
